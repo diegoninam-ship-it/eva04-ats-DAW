@@ -1,0 +1,163 @@
+services:
+
+  # ==========================================
+  # BASES DE DATOS
+  # ==========================================
+  mysql-usuario:
+    image: mysql:8.0
+    container_name: mysql-usuario
+    environment:
+      MYSQL_ROOT_PASSWORD: Root2026!
+      MYSQL_DATABASE: bd_usuario_dev
+    ports:
+      - "3307:3306"
+    networks:
+      - ats-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pRoot2026!"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mysql-vacante:
+    image: mysql:8.0
+    container_name: mysql-vacante
+    environment:
+      MYSQL_ROOT_PASSWORD: Root2026!
+      MYSQL_DATABASE: bd_vacante_dev
+    ports:
+      - "3308:3306"
+    networks:
+      - ats-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pRoot2026!"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mysql-postulacion:
+    image: mysql:8.0
+    container_name: mysql-postulacion
+    environment:
+      MYSQL_ROOT_PASSWORD: Root2026!
+      MYSQL_DATABASE: bd_postulacion_dev
+    ports:
+      - "3309:3306"
+    networks:
+      - ats-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pRoot2026!"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # CONFIG SERVER
+  # ==========================================
+  config-server:
+    build: ./config-server
+    container_name: config-server
+    ports:
+      - "8888:8888"
+    networks:
+      - ats-network
+
+  # ==========================================
+  # EUREKA SERVER
+  # ==========================================
+  eureka-server:
+    build: ./eureka-server
+    container_name: eureka-server
+    ports:
+      - "8761:8761"
+    networks:
+      - ats-network
+    depends_on:
+      - config-server
+
+  # ==========================================
+  # API GATEWAY
+  # ==========================================
+  api-gateway:
+    build: ./api-gateway
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    networks:
+      - ats-network
+    depends_on:
+      - config-server
+      - eureka-server
+    environment:
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka
+
+  # ==========================================
+  # MICROSERVICIOS
+  # ==========================================
+  usuario-service:
+    build: ./usuario-service
+    container_name: usuario-service
+    ports:
+      - "8083:8083"
+    networks:
+      - ats-network
+    depends_on:
+      config-server:
+        condition: service_started
+      eureka-server:
+        condition: service_started
+      mysql-usuario:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-usuario:3306/bd_usuario_dev
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: Root2026!
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka
+
+  vacante-service:
+    build: ./vacante-service
+    container_name: vacante-service
+    ports:
+      - "8081:8081"
+    networks:
+      - ats-network
+    depends_on:
+      config-server:
+        condition: service_started
+      eureka-server:
+        condition: service_started
+      mysql-vacante:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-vacante:3306/bd_vacante_dev
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: Root2026!
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka
+
+  postulacion-service:
+    build: ./postulacion-service
+    container_name: postulacion-service
+    ports:
+      - "8082:8082"
+    networks:
+      - ats-network
+    depends_on:
+      config-server:
+        condition: service_started
+      eureka-server:
+        condition: service_started
+      mysql-postulacion:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-postulacion:3306/bd_postulacion_dev
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: Root2026!
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka
+
+networks:
+  ats-network:
+    driver: bridge
